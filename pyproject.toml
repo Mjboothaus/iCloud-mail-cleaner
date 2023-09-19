@@ -1,0 +1,19 @@
+
+[project]
+name = ""
+version = ""
+description = ""
+authors = [
+    {name = "Michael Booth", email = "michael@databooth.com.au"},
+]
+dependencies = [
+    "configobj>=5.0.8",
+]
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "notebook>=6.5.4",
+    "black[jupyter]>=23.9.1",
+]

@@ -1,2 +1,4 @@
 config.ini
 *.txt.pdm-python
+__pycache__
+*.log

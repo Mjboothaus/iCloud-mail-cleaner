@@ -1,8 +1,7 @@
-
 [project]
-name = ""
-version = ""
-description = ""
+name = "iCloud-mail-cleaner"
+version = "0.1.0"
+description = "Default template for PDM package"
 authors = [
     {name = "Michael Booth", email = "michael@databooth.com.au"},
 ]
@@ -10,14 +9,19 @@ dependencies = [
     "configobj>=5.0.8",
     "tqdm>=4.66.1",
     "ipywidgets>=8.1.1",
-    "pandas>=2.1.1",
+    "pandas>=2.1.4",
 ]
-requires-python = ">=3.10"
+requires-python = "==3.11.*"
+readme = "README.md"
 license = {text = "MIT"}
+
+
+[tool.pdm]
+package-type = "application"
 
 [tool.pdm.dev-dependencies]
 dev = [
-    "notebook>=6.5.4",
-    "black[jupyter]>=23.9.1",
+    "notebook>=7.0.6",
+    "black[jupyter]>=23.12.1",
     "pytest>=7.4.3",
 ]

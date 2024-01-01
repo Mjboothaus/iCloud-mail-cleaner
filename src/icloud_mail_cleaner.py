@@ -1,18 +1,21 @@
-import logging
 import imaplib
+import logging
 import re
+import subprocess
 from getpass import getpass
 from pathlib import Path
-import subprocess
-
 
 from configobj import ConfigObj
 from tqdm.notebook import tqdm
 
+# TODO: Adjust ICloudCleaner to work with Paths or strings
+# TODO: Add typing to the code
+# TODO: Add docs (including README.md)
+# TODO: Get pytest-ing working
 
 # Configure logging
 logging.basicConfig(
-    filename="icloud-cleaner-oo.log",
+    filename="icloud-mail-cleaner.log",
     level=logging.INFO,
     filemode="a",
     format="%(asctime)s %(levelname)s:%(message)s",
@@ -43,9 +46,7 @@ class ICloudCleaner:
             )
             self.email_connection.login(self.config["username"], self.config["password"])
             self.email_connection.select(mailbox)
-            logging.info(
-                f"Successfully connected to {self.config['username']}@icloud.com - {mailbox}"
-            )
+            logging.info(f"Successfully connected to {self.config['username']}@icloud.com - {mailbox}")
         except Exception as e:
             logging.error(f"Failed to connect: {e}")
             raise
@@ -83,9 +84,7 @@ class ICloudCleaner:
         if target_emails_file and Path(target_emails_file).is_file():
             with open(target_emails_file, "r") as file:
                 target_emails = file.read().splitlines()
-                logging.info(
-                    f"Imported {len(target_emails)} emails from {target_emails_file}."
-                )
+                logging.info(f"Imported {len(target_emails)} emails from {target_emails_file}.")
                 print(f"INFO: Imported {len(target_emails)} emails from {target_emails_file}")
                 return target_emails
         else:
@@ -97,7 +96,7 @@ class ICloudCleaner:
             return []
 
     def clean_mailbox(self, close_mail_app=True, target_emails=None):
-        if close_mail_app and self.is_mail_app_running():
+        if close_mail_app and self.is_apple_mail_app_running():
             print("INFO: Mail app is being closed...")
             self.close_mail_app()
         try:
@@ -106,26 +105,22 @@ class ICloudCleaner:
             if not target_emails:
                 logging.error("No target emails provided.")
                 raise ValueError("No target emails provided.")
-            total_emails_count = 0
-            for target_email in tqdm(
-                target_emails, desc="Total emails", total=len(target_emails)
-            ):
+            total_emails_deleted = 0
+            for target_email in tqdm(target_emails, desc="Total emails", total=len(target_emails)):
                 if not self.validate_input_email(target_email):
                     logging.warning(f"The email '{target_email}' is not valid")
                     continue
 
                 emails = self.search_emails(target_email)
                 emails_count = len(emails) if emails else 0
-                total_deleted_emails = 0
+                n_deleted_email = 0
 
                 while emails_count > 0:
-                    for idx, e in tqdm(
-                        enumerate(emails), total=emails_count, desc=target_email
-                    ):
-                        uid = self.fetch_uid(e)
+                    for email in tqdm(emails, total=emails_count, desc=target_email):
+                        uid = self.fetch_uid(email)
                         if uid:
                             self.set_deleted(uid)
-                            total_deleted_emails += 1
+                            n_deleted_email += 1
 
                     self.email_connection.expunge()
                     logging.info(f"Deleted {emails_count} email(s) for {target_email}")
@@ -133,12 +128,12 @@ class ICloudCleaner:
                     emails_count = len(emails) if emails else 0
 
                 logging.info(
-                    f"Cleanup for {target_email} was successful. Deleted {total_deleted_emails} email(s)"
+                    f"Cleanup for {target_email} was successful. Deleted {n_deleted_email} email(s)"
                 )
-                total_emails_count += total_deleted_emails
+                total_emails_deleted += n_deleted_email
 
-            logging.info(f"The cleanup was successful. Deleted {total_emails_count} email(s)")
-            return total_emails_count
+            logging.info(f"The cleanup was successful. Deleted {total_emails_deleted} email(s)")
+            return total_emails_deleted
 
         finally:
             self.close_connection()
@@ -171,19 +166,17 @@ class ICloudCleaner:
             logging.error(f"The file {filename} doesn't exist.")
             return []
 
-    def is_mail_app_running(self):
+    def is_apple_mail_app_running(self):
         try:
             script = 'tell application "System Events" to (name of processes) contains "Mail"'
-            result = subprocess.run(
-                ["osascript", "-e", script], capture_output=True, text=True
-            )
+            result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
             return "true" in result.stdout.lower()
         except Exception as e:
             logging.error(f"Error checking if Mail app is running: {e}")
             return False
 
     def close_mail_app(self):
-        if self.is_mail_app_running():
+        if self.is_apple_mail_app_running():
             try:
                 script = 'tell application "Mail" to quit'
                 subprocess.run(["osascript", "-e", script], capture_output=True)

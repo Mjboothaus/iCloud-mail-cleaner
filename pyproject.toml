@@ -1,7 +1,7 @@
 [project]
 name = "iCloud-mail-cleaner"
 version = "0.1.0"
-description = "Default template for PDM package"
+description = "iCloud Mail cleaner"
 authors = [
     {name = "Michael Booth", email = "michael@databooth.com.au"},
 ]
@@ -12,14 +12,19 @@ dependencies = [
     "pandas>=2.1.4",
     "st-supabase-connection>=1.2.2",
     "watchdog>=3.0.0",
+    "st-login-form>=0.2.1",
+    "iCloud-mail-cleaner @ file:///${PROJECT_ROOT}/",
+    "duckdb>=0.10.1",
+    "loguru>=0.7.2",
 ]
-requires-python = "==3.11.*"
+requires-python = ">=3.11"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "DataBooth"}
+
 
 
 [tool.pdm]
-package-type = "application"
+distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
@@ -28,3 +33,7 @@ dev = [
     "pytest>=7.4.3",
     "pytest-mock>=3.12.0",
 ]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

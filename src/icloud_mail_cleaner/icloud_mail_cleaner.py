@@ -4,6 +4,7 @@ import re
 import subprocess
 from getpass import getpass
 from pathlib import Path
+from loguru import logger as logging
 
 from configobj import ConfigObj
 from tqdm.notebook import tqdm
@@ -13,22 +14,27 @@ from tqdm.notebook import tqdm
 # TODO: Add docs (including README.md)
 # TODO: Get pytest-ing working
 
-# Configure logging
-logging.basicConfig(
-    filename="icloud-mail-cleaner.log",
-    level=logging.INFO,
-    filemode="a",
-    format="%(asctime)s %(levelname)s:%(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# # Configure logging
+# logging.basicConfig(
+#     filename="icloud-mail-cleaner.log",
+#     level=logging.INFO,
+#     filemode="a",
+#     format="%(asctime)s %(levelname)s:%(message)s",
+#     datefmt="%Y-%m-%d %H:%M:%S",
+# )
 
 
 class ICloudCleaner:
-    def __init__(self, config_file):
+    def __init__(self, config_file, mode="app"):
         self.config = ConfigObj(config_file)
         self.email_connection = None
-        self._ensure_password()
-        self._connect()
+        self.mode = mode
+        if mode != "app":
+            self._ensure_password()
+            self._connect()
+        else:
+            self.password = None
+            self.username = None
         logging.info("")
         logging.info("New cleaning job starting...")
 
@@ -47,6 +53,17 @@ class ICloudCleaner:
             self.email_connection.login(self.config["username"], self.config["password"])
             self.email_connection.select(mailbox)
             logging.info(f"Successfully connected to {self.config['username']}@icloud.com - {mailbox}")
+        except Exception as e:
+            logging.error(f"Failed to connect: {e}")
+            raise
+
+
+    def connect(self, username, password, imap_server, imap_port, mailbox="INBOX"):
+        try:
+            self.email_connection = imaplib.IMAP4_SSL(imap_server, imap_port)
+            self.email_connection.login(username, password)
+            self.email_connection.select(mailbox)
+            logging.info(f"Successfully connected to {username}@icloud.com - {mailbox}")
         except Exception as e:
             logging.error(f"Failed to connect: {e}")
             raise

@@ -18,9 +18,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run the mail cleaning script
+        env:
+          IMAP_SERVER: ${{ secrets.ICLOUD_USERNAME }}
+          IMAP_PORT: ${{ secrets.ICLOUD_PASSWORD }}
         run: python src/icloud-mail-clean.py
-
-env:
-  IMAP_SERVER: ${{ secrets.ICLOUD_USERNAME }}
-  IMAP_PORT: ${{ secrets.ICLOUD_PASSWORD }}
-

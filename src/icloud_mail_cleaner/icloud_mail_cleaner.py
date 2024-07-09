@@ -48,6 +48,7 @@ class ICloudCleaner:
             self.email_connection = imaplib.IMAP4_SSL(
                 self.config["imap_server"], self.config["imap_port"]
             )
+            logger.info(f"Username: {os.getenv('ICLOUD_USERNAME')}; IMAP server: {self.config['imap_server']}; Port: {self.config['imap_port']}")
             self.email_connection.login(os.getenv('ICLOUD_USERNAME'), os.getenv('ICLOUD_PASSWORD'))
             self.email_connection.select(mailbox)
             logger.info(f"Successfully connected to {os.getenv('ICLOUD_USERNAME')}@icloud.com - {mailbox}")

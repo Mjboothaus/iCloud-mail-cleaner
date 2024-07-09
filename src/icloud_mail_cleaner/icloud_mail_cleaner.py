@@ -7,7 +7,7 @@ from pathlib import Path
 
 from configobj import ConfigObj
 from loguru import logger
-from tqdm.notebook import tqdm
+from tqdm.autonotebook import tqdm
 
 # TODO: Adjust ICloudCleaner to work with Paths or strings
 # TODO: Add typing to the code

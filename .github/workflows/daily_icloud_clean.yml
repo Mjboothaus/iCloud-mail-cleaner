@@ -1,0 +1,20 @@
+name: Scheduled Python Script - iCloud Cleaner
+on:
+  schedule:
+    # Runs at 5 PM every day
+    - cron: '0 17 * * *'
+
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run the mail cleaning script
+        run: python src/icloud-mail-clean.py

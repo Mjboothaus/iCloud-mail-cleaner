@@ -1,4 +1,4 @@
-config.ini
+.env
 *.txt.pdm-python
 __pycache__
 *.log

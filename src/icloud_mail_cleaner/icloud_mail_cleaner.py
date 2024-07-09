@@ -1,4 +1,5 @@
 import imaplib
+import os
 import re
 import subprocess
 import sys
@@ -6,6 +7,7 @@ from getpass import getpass
 from pathlib import Path
 
 from configobj import ConfigObj
+from dotenv import load_dotenv
 from loguru import logger
 from tqdm.autonotebook import tqdm
 
@@ -14,6 +16,8 @@ from tqdm.autonotebook import tqdm
 # TODO: Add docs (including README.md)
 # TODO: Get pytest-ing working
 
+# Load secrets environment variables from .env file
+load_dotenv()
 
 class ICloudCleaner:
     def __init__(self, config_file, mode="app", log_level="WARNING"):
@@ -33,8 +37,8 @@ class ICloudCleaner:
         logger.info("New cleaning job starting...")
 
     def _ensure_password(self):
-        if self.config["password"] == "":
-            self.config["password"] = getpass("Enter your email password: ")
+        if os.getenv('ICLOUD_PASSWORD') == "":
+            self.password = getpass("Enter your email password: ")
             logger.info("Password obtained from user input.")
         else:
             logger.info("Using password from config.ini.")
@@ -44,9 +48,9 @@ class ICloudCleaner:
             self.email_connection = imaplib.IMAP4_SSL(
                 self.config["imap_server"], self.config["imap_port"]
             )
-            self.email_connection.login(self.config["username"], self.config["password"])
+            self.email_connection.login(os.getenv('ICLOUD_USERNAME'), os.getenv('ICLOUD_PASSWORD'))
             self.email_connection.select(mailbox)
-            logger.info(f"Successfully connected to {self.config['username']}@icloud.com - {mailbox}")
+            logger.info(f"Successfully connected to {os.getenv('ICLOUD_USERNAME')}@icloud.com - {mailbox}")
         except Exception as e:
             logger.error(f"Failed to connect: {e}")
             raise

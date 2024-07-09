@@ -12,6 +12,7 @@ dependencies = [
     "pandas>=2.1.4",
     # "iCloud-mail-cleaner @ file:///${PROJECT_ROOT}/",
     "loguru>=0.7.2",
+    "python-dotenv>=1.0.1",
 ]
 requires-python = ">=3.11"
 readme = "README.md"

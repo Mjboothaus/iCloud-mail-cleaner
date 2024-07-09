@@ -1,9 +1,9 @@
 name: Scheduled Python Script - iCloud Cleaner
 on:
+  workflow_dispatch:
   schedule:
     # Runs at 5 PM every day
     - cron: '0 17 * * *'
-  workflow_dispatch:
 
 jobs:
   run-python-script:

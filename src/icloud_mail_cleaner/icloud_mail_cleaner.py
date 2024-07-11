@@ -6,7 +6,7 @@ import sys
 from getpass import getpass
 from pathlib import Path
 
-from ..pyproject import PythonProject
+from .pyproject import PythonProject
 
 from configobj import ConfigObj
 from dotenv import load_dotenv

@@ -6,6 +6,8 @@ import sys
 from getpass import getpass
 from pathlib import Path
 
+from ..pyproject import PythonProject
+
 from configobj import ConfigObj
 from dotenv import load_dotenv
 from loguru import logger
@@ -96,6 +98,7 @@ class ICloudCleaner:
 
     def load_target_emails(self):
         target_emails_file = self.config.get("target_emails_file")
+        target_emails_file = f"{PythonProject().root}/{target_emails_file}"
         if target_emails_file and Path(target_emails_file).is_file():
             with open(target_emails_file, "r") as file:
                 target_emails = file.read().splitlines()
@@ -121,31 +124,36 @@ class ICloudCleaner:
                 logger.error("No target emails provided.")
                 raise ValueError("No target emails provided.")
             total_emails_deleted = 0
-            for target_email in tqdm(target_emails, desc="Total emails", total=len(target_emails)):
-                if not self.validate_input_email(target_email):
-                    logger.warning(f"The email '{target_email}' is not valid")
-                    continue
 
-                emails = self.search_emails(target_email)
-                emails_count = len(emails) if emails else 0
-                n_deleted_email = 0
+            # Initialize tqdm for the total emails
+            with tqdm(total=len(target_emails), desc="Total emails") as pbar:
+                for target_email in target_emails:
+                    if not self.validate_input_email(target_email):
+                        logger.warning(f"The email '{target_email}' is not valid")
+                        pbar.update(1)
+                        continue
 
-                while emails_count > 0:
-                    for email in tqdm(emails, total=emails_count, desc=target_email):
-                        uid = self.fetch_uid(email)
-                        if uid:
-                            self.set_deleted(uid)
-                            n_deleted_email += 1
-
-                    self.email_connection.expunge()
-                    logger.info(f"Deleted {emails_count} email(s) for {target_email}")
                     emails = self.search_emails(target_email)
                     emails_count = len(emails) if emails else 0
+                    n_deleted_email = 0
 
-                logger.info(
-                    f"Cleanup for {target_email} was successful. Deleted {n_deleted_email} email(s)"
-                )
-                total_emails_deleted += n_deleted_email
+                    while emails_count > 0:
+                        for email in tqdm(emails, total=emails_count, desc=target_email):
+                            uid = self.fetch_uid(email)
+                            if uid:
+                                self.set_deleted(uid)
+                                n_deleted_email += 1
+
+                        self.email_connection.expunge()
+                        logger.info(f"Deleted {emails_count} email(s) for {target_email}")
+                        emails = self.search_emails(target_email)
+                        emails_count = len(emails) if emails else 0
+
+                    logger.info(
+                        f"Cleanup for {target_email} was successful. Deleted {n_deleted_email} email(s)"
+                    )
+                    total_emails_deleted += n_deleted_email
+                    pbar.update(1)  # Update the total emails progress bar
 
             logger.info(f"The cleanup was successful. Deleted {total_emails_deleted} email(s)")
             return total_emails_deleted

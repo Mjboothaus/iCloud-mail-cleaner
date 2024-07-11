@@ -21,4 +21,4 @@ jobs:
         env:
           ICLOUD_USERNAME: ${{ secrets.ICLOUD_USERNAME }}
           ICLOUD_PASSWORD: ${{ secrets.ICLOUD_PASSWORD }}
-        run: python src/icloud-mail-clean.py
+        run: python src/icloud-mail-clean-gh-action.py

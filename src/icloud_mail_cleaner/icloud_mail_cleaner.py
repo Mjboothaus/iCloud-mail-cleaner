@@ -46,30 +46,33 @@ class ICloudCleaner:
 
     This class provides functionality to connect to an iCloud email account,
     search for emails from specific senders, and delete them in bulk.
-    """
-
+    """   
     def __init__(self, config_file: Union[str, Path], mode: str = "app", log_level: str = "WARNING"):
-        """
-        Initialise ICloudCleaner.
-
-        Args:
-            config_file (Union[str, Path]): Path to the configuration file.
-            mode (str): Operating mode, either "app" or "script".
-            log_level (str): Logging level for console output.
-        """
         self.config = ConfigObj(str(config_file))
         self.email_connection: Optional[imaplib.IMAP4_SSL] = None
         self.mode = mode
+        self.is_connected = False
+        self.username: Optional[str] = None
+        self.password: Optional[str] = None
         self._setup_logging(log_level)
-
         if mode != "app":
             self._ensure_password()
             self._connect()
-        else:
-            self.password: Optional[str] = None
-            self.username: Optional[str] = None
-
         logger.info("New cleaning job starting...")
+
+
+    def print_config(self):
+        """Print out the current configuration settings."""
+        print("Configuration Settings:")
+        for section in self.config:
+            print(f"\n[{section}]")
+            print(f"Type: {type(self.config[section])}")
+            if isinstance(self.config[section], dict):
+                for key, value in self.config[section].items():
+                    print(f"{key} = {value}")
+            else:
+                print(self.config[section])
+
 
     def _setup_logging(self, log_level: str) -> None:
         """Set up logging configuration."""
@@ -78,55 +81,54 @@ class ICloudCleaner:
         logger.add(log_file, level="DEBUG", rotation="10 MB", compression="zip")
         logger.add(sys.stderr, level=log_level)
 
+    def ensure_connection(self):
+        if not self.is_connected:
+            if not self.username or not self.password:
+                raise ValueError("Username and password must be set before connecting")
+            self._connect()
+
     def _ensure_password(self) -> None:
-        """Ensure that the iCloud password is available."""
+        """Ensure that the iCloud username and password are available."""
+        self.username = os.getenv("ICLOUD_USERNAME")
+        if not self.username:
+            self.username = input("Enter your iCloud username: ")
+        
         if os.getenv("ICLOUD_PASSWORD") == "":
             self.password = getpass("Enter your email password: ")
             logger.info("Password obtained from user input.")
         else:
+            self.password = os.getenv("ICLOUD_PASSWORD")
             logger.info("Using password from environment variable.")
+
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _connect(self, mailbox: str = "INBOX") -> None:
-        """
-        Establish a connection to the iCloud email server.
-
-        Args:
-            mailbox (str): The mailbox to connect to. Defaults to "INBOX".
-
-        Raises:
-            ICloudConnectionError: If connection fails after retries.
-        """
         try:
             self.email_connection = imaplib.IMAP4_SSL(self.config["imap_server"], int(self.config["imap_port"]))
-            self.email_connection.login(os.getenv("ICLOUD_USERNAME"), os.getenv("ICLOUD_PASSWORD"))
+            self.email_connection.login(self.username, self.password)
             self.email_connection.select(mailbox)
-            logger.info(f"Successfully connected to {os.getenv('ICLOUD_USERNAME')}@icloud.com - {mailbox}")
+            self.is_connected = True
+            logger.info(f"Successfully connected to {self.username}@icloud.com - {mailbox}")
         except Exception as e:
             logger.error(f"Failed to connect: {e}")
             raise ICloudConnectionError(f"Failed to connect to iCloud: {e}")
 
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def search_emails(self, sender: str) -> Optional[List[bytes]]:
-        """
-        Search for emails from a specific sender.
-
-        Args:
-            sender (str): The email address of the sender to search for.
-
-        Returns:
-            Optional[List[bytes]]: A list of email IDs if found, None otherwise.
-
-        Raises:
-            EmailSearchError: If there's an error searching for emails.
-        """
+        self.ensure_connection()
         try:
             _, data = self.email_connection.search(None, f'(FROM "{sender}")')
             mail_ids = data[0]
             return mail_ids.split() if mail_ids else None
-        except Exception as e:
+        except imaplib.IMAP4.error as e:
+            if "LOGOUT" in str(e):
+                logger.warning("Connection lost. Attempting to reconnect.")
+                self.is_connected = False
+                self.ensure_connection()
+                return self.search_emails(sender)
             logger.error(f"Error searching emails from {sender}: {e}")
-            raise EmailSearchError(f"Error searching emails from {sender}: {e}")
+            return None
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def set_deleted(self, email_uid: Union[str, bytes]) -> None:
@@ -146,7 +148,8 @@ class ICloudCleaner:
             logger.error(f"Error setting email UID {email_uid} as deleted: {e}")
             raise EmailDeletionError(f"Error marking email UID {email_uid} for deletion: {e}")
 
-    def clean_mailbox(self, close_mail_app: bool = True, target_emails: Optional[List[str]] = None) -> int:
+
+    def clean_mailbox(self, target_emails: List[str] = None, close_mail_app: bool = True) -> List[tuple]:
         """
         Clean the mailbox by deleting emails from specified senders.
 
@@ -164,85 +167,61 @@ class ICloudCleaner:
             logger.info("Mail app is being closed...")
             self.close_mail_app()
 
-        try:
-            if target_emails is None:
-                target_emails = self.load_target_emails()
-            if not target_emails:
-                logger.error("No target emails provided.")
-                raise ValueError("No target emails provided.")
+        if target_emails is None:
+            target_emails = self.load_target_emails()
 
-            total_emails_deleted = 0
+        self.ensure_connection()
+        results = []
+        
 
-            with tqdm(total=len(target_emails), desc="Total emails") as pbar:
-                for target_email in target_emails:
-                    if not self.validate_input_email(target_email):
-                        logger.warning(f"The email '{target_email}' is not valid")
-                        pbar.update(1)
-                        continue
-
-                    emails = self.search_emails(target_email)
-                    emails_count = len(emails) if emails else 0
-                    n_deleted_email = 0
-
-                    while emails_count > 0:
-                        for email in tqdm(emails, total=emails_count, desc=target_email):
+        with tqdm(total=len(target_emails), desc="Overall progress") as pbar:
+            for target_email in target_emails:
+                emails = self.search_emails(target_email)
+                count = 0
+                if emails:
+                    with tqdm(total=len(emails), desc=f"Processing {target_email}", leave=False) as email_pbar:
+                        for email in emails:
                             uid = self.fetch_uid(email)
                             if uid:
                                 self.set_deleted(uid)
-                                n_deleted_email += 1
+                                count += 1
+                            email_pbar.update(1)
+                self.email_connection.expunge()
+                results.append((target_email.strip(), count))
+                pbar.update(1)
+        return results
 
-                        self.email_connection.expunge()
-                        logger.info(f"Deleted {emails_count} email(s) for {target_email}")
-                        emails = self.search_emails(target_email)
-                        emails_count = len(emails) if emails else 0
 
-                    logger.info(f"Cleanup for {target_email} was successful. Deleted {n_deleted_email} email(s)")
-                    total_emails_deleted += n_deleted_email
-                    pbar.update(1)
-
-            logger.info(f"The cleanup was successful. Deleted {total_emails_deleted} email(s)")
-            return total_emails_deleted
-
-        finally:
-            self.close_connection()
-
-    def connect(self, username: str, password: str, imap_server: str, imap_port: int, mailbox: str = "INBOX") -> None:
-        """
-        Establish a connection to the iCloud email server.
-
-        Args:
-            username (str): The iCloud email username.
-            password (str): The iCloud email password.
-            imap_server (str): The IMAP server address.
-            imap_port (int): The IMAP server port.
-            mailbox (str, optional): The mailbox to connect to. Defaults to "INBOX".
-
-        Raises:
-            Exception: If connection fails.
-        """
+    def connect(self, username: str, password: str, imap_server: str, imap_port: int, mailbox: str = "INBOX"):
         try:
+            if self.email_connection:
+                self.close_connection()
+            
             self.email_connection = imaplib.IMAP4_SSL(imap_server, imap_port)
             self.email_connection.login(username, password)
             self.email_connection.select(mailbox)
+            self.is_connected = True
+            self.username = username
+            self.password = password
             logger.info(f"Successfully connected to {username}@icloud.com - {mailbox}")
         except Exception as e:
             logger.error(f"Failed to connect: {e}")
+            self.is_connected = False
             raise
 
-    def close_connection(self) -> None:
-        """
-        Close the IMAP connection to the email server.
-
-        This method attempts to close and logout from the IMAP connection if it exists.
-        Any exceptions during this process are caught and logged.
-        """
-        if self.email_connection:
+    def close_connection(self):
+        if self.is_connected and self.email_connection:
             try:
                 self.email_connection.close()
                 self.email_connection.logout()
                 logger.info("IMAP connection closed successfully.")
             except Exception as e:
                 logger.error(f"Failed to close IMAP connection: {e}")
+            finally:
+                self.is_connected = False
+                self.email_connection = None
+                self.username = None
+                self.password = None
 
     def fetch_uid(self, email_id: bytes) -> Optional[str]:
         """

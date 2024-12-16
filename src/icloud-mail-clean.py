@@ -8,6 +8,8 @@ assert CONFIG_FILE.exists()
 # `target_emails_file` is defined within `config.ini`
 
 cleaner = ICloudCleaner(str(CONFIG_FILE), mode="script", log_level="WARNING")
-total_emails_deleted = cleaner.clean_mailbox(close_mail_app=True)
-logger.info(f"Total emails deleted: {total_emails_deleted}")
-print(f"Total emails deleted: {total_emails_deleted}")
+deletion_results = cleaner.clean_mailbox(close_mail_app=True)
+total_deletions = sum(count for _, count in deletion_results)
+logger.info(f"Total emails deleted: {total_deletions}")
+print(f"Total emails deleted: {total_deletions}")
+

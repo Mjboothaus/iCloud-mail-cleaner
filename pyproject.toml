@@ -10,7 +10,6 @@ dependencies = [
     "tqdm>=4.66.1",
     "ipywidgets>=8.1.1",
     "pandas>=2.1.4",
-    # "iCloud-mail-cleaner @ file:///${PROJECT_ROOT}/",
     "loguru>=0.7.2",
     "python-dotenv>=1.0.1",
     "tenacity>=9.0.0",
@@ -21,18 +20,10 @@ readme = "README.md"
 license = {text = "DataBooth"}
 
 
-
-[tool.pdm]
-distribution = false
-
-[tool.pdm.dev-dependencies]
-dev = [
+[tool.uv]
+dev-dependencies = [
     "notebook>=7.0.6",
     "black[jupyter]>=23.12.1",
     "pytest>=7.4.3",
     "pytest-mock>=3.12.0",
 ]
-
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
